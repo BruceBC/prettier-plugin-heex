@@ -1,13 +1,11 @@
 import Parser from 'tree-sitter'
 import HEEx from 'tree-sitter-heex'
-import { createSorter } from 'prettier-plugin-tailwindcss'
+import { createSorter } from 'prettier-plugin-tailwindcss/sorter'
 
 const parser = new Parser()
 parser.setLanguage(HEEx)
 
-const sorter = await createSorter({
-  stylesheetPath: '../hello_world/assets/css/app.css'
-})
+const sorters = new Map()
 
 const QUOTED_CLASSES = `
     (attribute
@@ -17,14 +15,23 @@ const QUOTED_CLASSES = `
         (#eq? @name "class"))
     `
 
-function parse(text, options) {
+// TODO: Implement expression classes
+const EXPRESSION_CLASSES = `
+    (attribute
+        (attribute_name) @name
+        (expression 
+        (expression_value) @value)
+        (#eq? @name "class"))
+    `
+
+async function parse(text, options) {
   return {
     type: "root",
-    source: prettify(text)
+    source: await prettify(text, options)
   }
 }
 
-function prettify(source) {
+async function prettify(source, options) {
     const tree = parser.parse(source)
     const query = new Parser.Query(HEEx, QUOTED_CLASSES)
     const nodes = []
@@ -35,16 +42,33 @@ function prettify(source) {
             .forEach(c => nodes.push(c.node))
     }
 
-    return nodes
-        .sort((a, b) => b.startIndex - a.startIndex)
-        .reduce((source, node) => {
-            const sortedClasses = sortTailwindClasses(node)
-            return source.slice(0, node.startIndex) + sortedClasses + source.slice(node.endIndex)
+    const classes = await sortTailwindClasses(
+        nodes
+          .sort((a, b) => b.startIndex - a.startIndex)
+          .map(n => n.text),
+        options.tailwindStylesheet
+    )
+
+    return zip(nodes, classes).reduce((source, [node, cls]) => {
+            return source.slice(0, node.startIndex) + cls + source.slice(node.endIndex)
         }, source)
 }
 
-function sortTailwindClasses(node) {
-    return node.text.split(" ").sort().join(" ")
+async function sortTailwindClasses(classes, stylesheetPath) {
+    let sorter;
+
+    if (sorters.has(stylesheetPath)) {
+      sorter = sorters.get(stylesheetPath)
+    } else {
+      sorter = await createSorter({ stylesheetPath })
+      sorters.set(stylesheetPath, sorter)
+    }
+
+    return await sorter.sortClassAttributes(classes)
+}
+
+function zip(leftArr, rightArr) {
+  return leftArr.map((val, i) => [val, rightArr[i]])
 }
 
 function print(path, options, print) {
@@ -71,4 +95,11 @@ export default {
         print
     }
   },
+  options: {
+    tailwindStylesheet: {
+      type: "string",
+      default: "",
+      description: "Path to the Tailwind CSS stylesheet (v4+)"
+    }
+  }
 }
