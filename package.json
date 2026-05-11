@@ -1,0 +1,22 @@
+{
+  "name": "prettier-plugin-heex",
+  "version": "1.0.0",
+  "description": "Prettier plugin for HEEx templates",
+  "main": "plugin.mjs",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "prettier": "^3.0.0",
+    "prettier-plugin-tailwindcss": "^0.8.0",
+    "tree-sitter": "^0.25.0",
+    "tree-sitter-heex": "github:phoenixframework/tree-sitter-heex"
+  },
+  "trustedDependencies": [
+    "tree-sitter-heex"
+  ]
+}
